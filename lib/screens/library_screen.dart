@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../theme/theme.dart';
+import 'favorites_tab.dart';
 import 'playlist_detail_screen.dart';
 
 // Diálogo que maneja su propio campo de texto
@@ -148,7 +149,9 @@ class LibraryScreen extends StatelessWidget {
         ),
         body: TabBarView(
           children: [
-            const Center(child: Text('Próximamente')),
+            // Songs: canciones favoritas
+            const FavoritesTab(),
+
             const Center(child: Text('Próximamente')),
 
             // Playlists del usuario

@@ -1,4 +1,8 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../theme/theme.dart';
@@ -23,24 +27,68 @@ class PlayerScreen extends StatefulWidget {
 
 class _PlayerScreenState extends State<PlayerScreen> {
   final player = AudioPlayer();
-  bool favorito = false;
+  late final DocumentReference favRef;
 
   @override
   void initState() {
     super.initState();
+
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final id = '${widget.titulo}|${widget.artista}'.replaceAll('/', '-');
+
+    favRef = FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(uid)
+        .collection('favoritos')
+        .doc(id);
+
     _cargarAudio();
   }
 
   Future<void> _cargarAudio() async {
+    if (widget.audioUrl.isEmpty) return;
+
     try {
       await player.setUrl(widget.audioUrl);
       player.play();
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo cargar el audio: $e')),
+        const SnackBar(content: Text('No se pudo cargar el audio')),
       );
     }
+  }
+
+  Future<void> _alternarFavorito(bool esFavorito) async {
+    if (esFavorito) {
+      await favRef.delete();
+    } else {
+      await favRef.set({
+        'titulo': widget.titulo,
+        'artista': widget.artista,
+        'portada': widget.portada,
+        'audioUrl': widget.audioUrl,
+      });
+    }
+  }
+
+  void _mover(Duration posicion, int segundos) {
+    final duracion = player.duration ?? Duration.zero;
+    final nueva = posicion + Duration(seconds: segundos);
+
+    if (nueva < Duration.zero) {
+      player.seek(Duration.zero);
+    } else if (nueva > duracion) {
+      player.seek(duracion);
+    } else {
+      player.seek(nueva);
+    }
+  }
+
+  String _formato(Duration d) {
+    final min = d.inMinutes;
+    final seg = (d.inSeconds % 60).toString().padLeft(2, '0');
+    return '$min:$seg';
   }
 
   @override
@@ -52,123 +100,138 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(title: const Text('Reproduciendo')),
       body: Padding(
         padding: const EdgeInsets.all(AppSpacing.spacing24),
         child: Column(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.radius16),
-              child: Image.network(
-                widget.portada,
-                width: 280,
-                height: 280,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(
-                  width: 280,
-                  height: 280,
-                  color: AppColors.neutral900,
-                  child: const Icon(Icons.music_note, size: 64),
+            // Portada
+            AspectRatio(
+              aspectRatio: 1,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.radius16),
+                child: Image.network(
+                  widget.portada,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    color: colors.primaryContainer,
+                    child: Icon(
+                      Icons.music_note,
+                      color: colors.onPrimaryContainer,
+                    ),
+                  ),
                 ),
               ),
             ),
+
             const SizedBox(height: AppSpacing.spacing24),
 
+            // Título, artista y favorito
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.titulo, style: text.headlineLarge),
-                      Text(widget.artista, style: text.bodyMedium),
+                      Text(
+                        widget.titulo,
+                        style: text.headlineLarge,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(widget.artista, style: text.bodyLarge),
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: Icon(
-                    favorito ? Icons.favorite : Icons.favorite_border,
-                  ),
-                  onPressed: () {
-                    setState(() => favorito = !favorito);
+                StreamBuilder<DocumentSnapshot>(
+                  stream: favRef.snapshots(),
+                  builder: (context, snapshot) {
+                    final esFavorito = snapshot.data?.exists ?? false;
+
+                    return IconButton(
+                      icon: Icon(
+                        esFavorito ? Icons.favorite : Icons.favorite_border,
+                        color: esFavorito ? colors.primary : null,
+                      ),
+                      onPressed: () => _alternarFavorito(esFavorito),
+                    );
                   },
                 ),
               ],
             ),
 
-            const SizedBox(height: AppSpacing.spacing24),
+            const SizedBox(height: AppSpacing.spacing16),
 
+            // Barra de progreso
             StreamBuilder<Duration>(
               stream: player.positionStream,
               builder: (context, snapshot) {
                 final posicion = snapshot.data ?? Duration.zero;
                 final duracion = player.duration ?? Duration.zero;
+                final maximo = max(duracion.inSeconds.toDouble(), 1.0);
+                final valor = min(posicion.inSeconds.toDouble(), maximo);
 
                 return Column(
                   children: [
                     Slider(
-                      value: posicion.inSeconds.toDouble().clamp(
-                            0,
-                            duracion.inSeconds.toDouble(),
-                          ),
-                      max: duracion.inSeconds.toDouble() == 0
-                          ? 1
-                          : duracion.inSeconds.toDouble(),
-                      onChanged: (value) {
-                        player.seek(Duration(seconds: value.toInt()));
-                      },
+                      value: valor,
+                      max: maximo,
+                      onChanged: duracion == Duration.zero
+                          ? null
+                          : (v) => player.seek(Duration(seconds: v.toInt())),
                     ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(_formatear(posicion)),
-                        Text(_formatear(duracion)),
+                        Text(_formato(posicion), style: text.bodySmall),
+                        Text(_formato(duracion), style: text.bodySmall),
                       ],
                     ),
-                  ],
-                );
-              },
-            ),
+                    const SizedBox(height: AppSpacing.spacing16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.replay_10),
+                          onPressed: () => _mover(posicion, -10),
+                        ),
+                        const SizedBox(width: AppSpacing.spacing16),
 
-            const SizedBox(height: AppSpacing.spacing16),
+                        // Play / pausa
+                        StreamBuilder<PlayerState>(
+                          stream: player.playerStateStream,
+                          builder: (context, estado) {
+                            final reproduciendo = estado.data?.playing ?? false;
 
-            StreamBuilder<PlayerState>(
-              stream: player.playerStateStream,
-              builder: (context, snapshot) {
-                final estaSonando = snapshot.data?.playing ?? false;
+                            return IconButton.filled(
+                              iconSize: AppSpacing.spacing32,
+                              icon: Icon(
+                                reproduciendo ? Icons.pause : Icons.play_arrow,
+                              ),
+                              onPressed: () {
+                                if (reproduciendo) {
+                                  player.pause();
+                                } else if (estado.data?.processingState ==
+                                    ProcessingState.completed) {
+                                  player.seek(Duration.zero);
+                                  player.play();
+                                } else {
+                                  player.play();
+                                }
+                              },
+                            );
+                          },
+                        ),
 
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.fast_rewind),
-                      iconSize: 36,
-                      onPressed: () {
-                        player.seek(
-                          player.position - const Duration(seconds: 10),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: AppSpacing.spacing16),
-                    IconButton.filled(
-                      icon: Icon(estaSonando ? Icons.pause : Icons.play_arrow),
-                      iconSize: 36,
-                      onPressed: () {
-                        estaSonando ? player.pause() : player.play();
-                      },
-                    ),
-                    const SizedBox(width: AppSpacing.spacing16),
-                    IconButton(
-                      icon: const Icon(Icons.fast_forward),
-                      iconSize: 36,
-                      onPressed: () {
-                        player.seek(
-                          player.position + const Duration(seconds: 10),
-                        );
-                      },
+                        const SizedBox(width: AppSpacing.spacing16),
+                        IconButton(
+                          icon: const Icon(Icons.forward_10),
+                          onPressed: () => _mover(posicion, 10),
+                        ),
+                      ],
                     ),
                   ],
                 );
@@ -178,11 +241,5 @@ class _PlayerScreenState extends State<PlayerScreen> {
         ),
       ),
     );
-  }
-
-  String _formatear(Duration d) {
-    final minutos = d.inMinutes.toString().padLeft(1, '0');
-    final segundos = (d.inSeconds % 60).toString().padLeft(2, '0');
-    return '$minutos:$segundos';
   }
 }
