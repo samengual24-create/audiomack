@@ -34,6 +34,8 @@ class AppColors {
   static const neutral0 = Color(0xFFFFFFFF);
   static const neutral400 = Color(0xFF9E9E9E);
   static const neutral900 = Color(0xFF121212);
+  static const discover500 = Color(0xFFEE7744);
+  static const discover800 = Color(0xFFA8461E);
 }
 
 class AppElevation {

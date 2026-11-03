@@ -14,40 +14,67 @@ class PlaylistDetailScreen extends StatelessWidget {
     required this.nombre,
   });
 
-  Future<void> _agregarCancion(BuildContext context) async {
-    final cancionesSnap =
-        await FirebaseFirestore.instance.collection('canciones').get();
+  DocumentReference get _ref =>
+      FirebaseFirestore.instance.collection('playlists').doc(playlistId);
 
+  // Agregar canciones a la playlist
+  Future<void> _agregarCancion(BuildContext context) async {
+    final snap = await FirebaseFirestore.instance.collection('canciones').get();
     if (!context.mounted) return;
 
-    final seleccionada = await showDialog<String>(
+    await showDialog<void>(
       context: context,
-      builder: (context) => SimpleDialog(
+      builder: (context) => AlertDialog(
         title: const Text('Agregar canción'),
-        children: cancionesSnap.docs.map((doc) {
-          final data = doc.data();
-          return SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, doc.id),
-            child: Text('${data['titulo']} — ${data['artista']}'),
-          );
-        }).toList(),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: snap.docs.map((d) {
+              final data = d.data();
+              return ListTile(
+                title: Text((data['titulo'] ?? '').toString()),
+                subtitle: Text((data['artista'] ?? '').toString()),
+                onTap: () {
+                  _ref.update({
+                    'canciones': FieldValue.arrayUnion([d.id]),
+                  });
+                  Navigator.pop(context);
+                },
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar'),
+          ),
+        ],
       ),
     );
+  }
 
-    if (seleccionada == null) return;
-
-    await FirebaseFirestore.instance
-        .collection('playlists')
-        .doc(playlistId)
-        .update({
-      'canciones': FieldValue.arrayUnion([seleccionada]),
+  // Quitar una canción de la playlist
+  Future<void> _quitarCancion(String cancionId) {
+    return _ref.update({
+      'canciones': FieldValue.arrayRemove([cancionId]),
     });
+  }
+
+  Future<List<DocumentSnapshot>> _cargarCanciones(List ids) {
+    return Future.wait(
+      ids.map(
+        (id) => FirebaseFirestore.instance
+            .collection('canciones')
+            .doc(id.toString())
+            .get(),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-
     return Scaffold(
       appBar: AppBar(
         title: Text(nombre),
@@ -59,75 +86,55 @@ class PlaylistDetailScreen extends StatelessWidget {
         ],
       ),
       body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('playlists')
-            .doc(playlistId)
-            .snapshots(),
-        builder: (context, playlistSnap) {
-          if (!playlistSnap.hasData) {
+        stream: _ref.snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final data = playlistSnap.data!.data() as Map<String, dynamic>?;
-          final List<dynamic> cancionesIds = data?['canciones'] ?? [];
+          final data = snapshot.data!.data() as Map<String, dynamic>?;
+          final ids = (data?['canciones'] as List?) ?? [];
 
-          if (cancionesIds.isEmpty) {
+          if (ids.isEmpty) {
             return const Center(
-              child: Text('Esta playlist no tiene canciones todavía'),
+              child: Text('Esta playlist está vacía. Agrega canciones con +'),
             );
           }
 
           return FutureBuilder<List<DocumentSnapshot>>(
-            future: Future.wait(
-              cancionesIds.map(
-                (id) => FirebaseFirestore.instance
-                    .collection('canciones')
-                    .doc(id)
-                    .get(),
-              ),
-            ),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
+            future: _cargarCanciones(ids),
+            builder: (context, futuro) {
+              if (!futuro.hasData) {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              final canciones = snapshot.data!;
+              final canciones = futuro.data!.where((d) => d.exists).toList();
 
               return ListView.builder(
+                padding: const EdgeInsets.all(AppSpacing.spacing8),
                 itemCount: canciones.length,
                 itemBuilder: (context, index) {
-                  final cancionData =
-                      canciones[index].data() as Map<String, dynamic>?;
-
-                  if (cancionData == null) return const SizedBox.shrink();
+                  final doc = canciones[index];
+                  final c = doc.data() as Map<String, dynamic>;
 
                   return ListTile(
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadius.radius8),
-                      child: Image.network(
-                        cancionData['portada'] ?? '',
-                        width: 48,
-                        height: 48,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
-                          width: 48,
-                          height: 48,
-                          color: AppColors.neutral900,
-                          child: const Icon(Icons.music_note),
-                        ),
-                      ),
+                    leading: const Icon(Icons.music_note),
+                    title: Text((c['titulo'] ?? '').toString()),
+                    subtitle: Text((c['artista'] ?? '').toString()),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.remove_circle_outline),
+                      tooltip: 'Quitar de la playlist',
+                      onPressed: () => _quitarCancion(doc.id),
                     ),
-                    title: Text(cancionData['titulo'] ?? ''),
-                    subtitle: Text(cancionData['artista'] ?? ''),
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => PlayerScreen(
-                            titulo: cancionData['titulo'] ?? '',
-                            artista: cancionData['artista'] ?? '',
-                            portada: cancionData['portada'] ?? '',
-                            audioUrl: cancionData['audioUrl'] ?? '',
+                            titulo: (c['titulo'] ?? '').toString(),
+                            artista: (c['artista'] ?? '').toString(),
+                            portada: (c['portada'] ?? '').toString(),
+                            audioUrl: (c['audioUrl'] ?? '').toString(),
                           ),
                         ),
                       );
