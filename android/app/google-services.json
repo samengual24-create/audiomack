@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "64138981246",
+    "project_id": "audiomack-c6fd2",
+    "storage_bucket": "audiomack-c6fd2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:64138981246:android:cc534f77879a443de48d2f",
+        "android_client_info": {
+          "package_name": "com.example.audiomack"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDlkfafTmoRk1Dmb_GQCpfy6qUni_yVdNY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
