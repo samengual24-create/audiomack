@@ -34,33 +34,44 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _cancionTile(BuildContext context, Map<String, dynamic> d) {
+    final colors = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+
+    final titulo = (d['titulo'] ?? '').toString();
+    final artista = (d['artista'] ?? '').toString();
+    final portada = (d['portada'] ?? '').toString();
+    final audioUrl = (d['audioUrl'] ?? '').toString();
+
     return ListTile(
       leading: ClipRRect(
         borderRadius: BorderRadius.circular(AppRadius.radius8),
         child: Image.network(
-          d['portada'] ?? '',
-          width: 48,
-          height: 48,
+          portada,
+          width: AppSizes.thumbnail,
+          height: AppSizes.thumbnail,
           fit: BoxFit.cover,
           errorBuilder: (_, _, _) => Container(
-            width: 48,
-            height: 48,
-            color: AppColors.neutral900,
-            child: const Icon(Icons.music_note),
+            width: AppSizes.thumbnail,
+            height: AppSizes.thumbnail,
+            color: colors.primaryContainer,
+            child: Icon(
+              Icons.music_note,
+              color: colors.onPrimaryContainer,
+            ),
           ),
         ),
       ),
-      title: Text(d['titulo'] ?? ''),
-      subtitle: Text(d['artista'] ?? ''),
+      title: Text(titulo, style: text.titleMedium),
+      subtitle: Text(artista),
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => PlayerScreen(
-              titulo: d['titulo'] ?? '',
-              artista: d['artista'] ?? '',
-              portada: d['portada'] ?? '',
-              audioUrl: d['audioUrl'] ?? '',
+              titulo: titulo,
+              artista: artista,
+              portada: portada,
+              audioUrl: audioUrl,
             ),
           ),
         );
@@ -140,7 +151,9 @@ class _SearchScreenState extends State<SearchScreen> {
                       .toList();
 
                   final songs = canciones
-                      .where((d) => _coincide(d['titulo']) || _coincide(d['artista']))
+                      .where(
+                        (d) => _coincide(d['titulo']) || _coincide(d['artista']),
+                      )
                       .toList();
 
                   final artistas = canciones
@@ -164,7 +177,9 @@ class _SearchScreenState extends State<SearchScreen> {
                         ...songs.map((s) => _cancionTile(context, s)),
                       ]),
                       _lista(songs.map((s) => _cancionTile(context, s)).toList()),
-                      _lista(artistas.map((a) => _artistaTile(context, a)).toList()),
+                      _lista(
+                        artistas.map((a) => _artistaTile(context, a)).toList(),
+                      ),
                       _lista(
                         albums
                             .map(

@@ -162,6 +162,7 @@ class _Seccion extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -170,7 +171,7 @@ class _Seccion extends StatelessWidget {
         if (subtitulo.isNotEmpty) Text(subtitulo, style: text.bodySmall),
         const SizedBox(height: AppSpacing.spacing16),
         SizedBox(
-          height: 180,
+          height: AppSizes.sectionHeight,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: canciones.length,
@@ -178,49 +179,58 @@ class _Seccion extends StatelessWidget {
                 const SizedBox(width: AppSpacing.spacing16),
             itemBuilder: (context, index) {
               final d = canciones[index];
+              final tituloCancion = (d['titulo'] ?? '').toString();
+              final artista = (d['artista'] ?? '').toString();
+              final portada = (d['portada'] ?? '').toString();
+              final audioUrl = (d['audioUrl'] ?? '').toString();
 
               return InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.radius8),
                 onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => PlayerScreen(
-                        titulo: d['titulo'] ?? '',
-                        artista: d['artista'] ?? '',
-                        portada: d['portada'] ?? '',
-                        audioUrl: d['audioUrl'] ?? '',
+                        titulo: tituloCancion,
+                        artista: artista,
+                        portada: portada,
+                        audioUrl: audioUrl,
                       ),
                     ),
                   );
                 },
                 child: SizedBox(
-                  width: 120,
+                  width: AppSizes.cardCover,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(AppRadius.radius8),
                         child: Image.network(
-                          d['portada'] ?? '',
-                          width: 120,
-                          height: 120,
+                          portada,
+                          width: AppSizes.cardCover,
+                          height: AppSizes.cardCover,
                           fit: BoxFit.cover,
                           errorBuilder: (_, _, _) => Container(
-                            width: 120,
-                            height: 120,
-                            color: AppColors.neutral900,
-                            child: const Icon(Icons.music_note),
+                            width: AppSizes.cardCover,
+                            height: AppSizes.cardCover,
+                            color: colors.primaryContainer,
+                            child: Icon(
+                              Icons.music_note,
+                              color: colors.onPrimaryContainer,
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(height: AppSpacing.spacing8),
                       Text(
-                        d['titulo'] ?? '',
+                        tituloCancion,
+                        style: text.titleMedium,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        d['artista'] ?? '',
+                        artista,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: text.bodySmall,
