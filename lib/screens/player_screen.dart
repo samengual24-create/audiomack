@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:just_audio/just_audio.dart';
 
+import '../services/player_service.dart';
 import '../theme/theme.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -26,8 +27,10 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  final player = AudioPlayer();
+  final servicio = PlayerService.instance;
   late final DocumentReference favRef;
+
+  AudioPlayer get player => servicio.player;
 
   @override
   void initState() {
@@ -46,13 +49,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _cargarAudio() async {
-    if (widget.audioUrl.isEmpty) return;
+    final ok = await servicio.reproducir(
+      titulo: widget.titulo,
+      artista: widget.artista,
+      portada: widget.portada,
+      audioUrl: widget.audioUrl,
+    );
 
-    try {
-      await player.setUrl(widget.audioUrl);
-      player.play();
-    } catch (_) {
-      if (!mounted) return;
+    if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No se pudo cargar el audio')),
       );
@@ -89,12 +93,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final min = d.inMinutes;
     final seg = (d.inSeconds % 60).toString().padLeft(2, '0');
     return '$min:$seg';
-  }
-
-  @override
-  void dispose() {
-    player.dispose();
-    super.dispose();
   }
 
   @override
@@ -138,7 +136,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     children: [
                       Text(
                         widget.titulo,
-                        style: text.headlineLarge,
+                        style: text.headlineMedium,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
