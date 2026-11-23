@@ -50,9 +50,14 @@ class ArtistsTab extends StatelessWidget {
           itemBuilder: (context, index) {
             final nombre = nombres[index];
             final lista = grupos[nombre]!;
-            final portada = (lista.first['portada'] ?? '').toString();
+                        final portada = lista
+                .map((c) => (c['fotoArtista'] ?? '').toString())
+                .firstWhere(
+                  (f) => f.isNotEmpty,
+                  orElse: () => (lista.first['portada'] ?? '').toString(),
+                );
             final cantidad = '${lista.length} canciones';
-
+            
             return ListTile(
               leading: ClipRRect(
                 borderRadius: BorderRadius.circular(AppRadius.radiusFull),

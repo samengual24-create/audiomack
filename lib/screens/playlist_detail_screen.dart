@@ -2,11 +2,13 @@ import 'dart:math';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:file_selector/file_selector.dart';
 
 import '../theme/theme.dart';
 import 'player_screen.dart';
 
-class PlaylistDetailScreen extends StatelessWidget {
+class PlaylistDetailScreen extends StatefulWidget {
   final String playlistId;
   final String nombre;
 
@@ -16,8 +18,16 @@ class PlaylistDetailScreen extends StatelessWidget {
     required this.nombre,
   });
 
-  DocumentReference get _ref =>
-      FirebaseFirestore.instance.collection('playlists').doc(playlistId);
+  @override
+  State<PlaylistDetailScreen> createState() => _PlaylistDetailScreenState();
+}
+
+class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
+  bool _subiendo = false;
+
+  DocumentReference get _ref => FirebaseFirestore.instance
+      .collection('playlists')
+      .doc(widget.playlistId);
 
   void _abrir(BuildContext context, Map<String, dynamic> c) {
     Navigator.push(
@@ -37,6 +47,47 @@ class PlaylistDetailScreen extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Próximamente')),
     );
+  }
+
+  // Elige una imagen, la sube a Storage y guarda la URL en la playlist
+  Future<void> _cambiarFoto() async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      final archivo = await openFile(
+        acceptedTypeGroups: [
+          XTypeGroup(
+            label: 'Imágenes',
+            extensions: ['jpg', 'jpeg', 'png'],
+            mimeTypes: ['image/jpeg', 'image/png'],
+          ),
+        ],
+      );
+      if (archivo == null) return;
+
+      setState(() => _subiendo = true);
+
+      final bytes = await archivo.readAsBytes();
+      final esPng = archivo.name.toLowerCase().endsWith('.png');
+
+      final ref = FirebaseStorage.instance.ref(
+        'playlists/${widget.playlistId}.${esPng ? 'png' : 'jpg'}',
+      );
+
+      await ref.putData(
+        bytes,
+        SettableMetadata(contentType: esPng ? 'image/png' : 'image/jpeg'),
+      );
+
+      final url = await ref.getDownloadURL();
+      await _ref.update({'foto': url});
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo subir la foto: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _subiendo = false);
+    }
   }
 
   // Agregar canciones a la playlist
@@ -125,7 +176,8 @@ class PlaylistDetailScreen extends StatelessWidget {
 
           final data = snapshot.data!.data() as Map<String, dynamic>?;
           final ids = (data?['canciones'] as List?) ?? [];
-          final nombrePlaylist = (data?['nombre'] ?? nombre).toString();
+          final nombrePlaylist = (data?['nombre'] ?? widget.nombre).toString();
+          final foto = (data?['foto'] ?? '').toString();
 
           return FutureBuilder<List<DocumentSnapshot>>(
             future: _cargarCanciones(ids),
@@ -140,22 +192,55 @@ class PlaylistDetailScreen extends StatelessWidget {
               return ListView(
                 padding: const EdgeInsets.all(AppSpacing.spacing16),
                 children: [
-                  // Portada de la playlist
+                  // Foto de la playlist (toca para cambiarla)
                   Center(
                     child: FractionallySizedBox(
                       widthFactor: 0.6,
                       child: AspectRatio(
                         aspectRatio: 1,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: colors.secondaryContainer,
+                        child: GestureDetector(
+                          onTap: _subiendo ? null : _cambiarFoto,
+                          child: ClipRRect(
                             borderRadius:
                                 BorderRadius.circular(AppRadius.radius16),
-                          ),
-                          child: Icon(
-                            Icons.queue_music,
-                            size: AppSizes.cardCover,
-                            color: colors.onSurfaceVariant,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                foto.isEmpty
+                                    ? Container(
+                                        color: colors.secondaryContainer,
+                                        child: Icon(
+                                          Icons.queue_music,
+                                          size: AppSizes.cardCover,
+                                          color: colors.onSurfaceVariant,
+                                        ),
+                                      )
+                                    : Image.network(
+                                        foto,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, _, _) => Container(
+                                          color: colors.secondaryContainer,
+                                          child: Icon(
+                                            Icons.broken_image,
+                                            color: colors.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ),
+                                Positioned(
+                                  right: AppSpacing.spacing8,
+                                  bottom: AppSpacing.spacing8,
+                                  child: IconButton.filled(
+                                    tooltip: 'Cambiar foto',
+                                    icon: const Icon(Icons.photo_camera),
+                                    onPressed: _subiendo ? null : _cambiarFoto,
+                                  ),
+                                ),
+                                if (_subiendo)
+                                  const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
