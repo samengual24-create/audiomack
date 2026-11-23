@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../theme/theme.dart';
+import 'artists_albums_tabs.dart';
 import 'favorites_tab.dart';
 import 'playlist_detail_screen.dart';
 
@@ -128,17 +129,50 @@ class LibraryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final colors = Theme.of(context).colorScheme;
     final uid = FirebaseAuth.instance.currentUser!.uid;
 
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Library'),
+          title: const Text('My Library'),
+          actions: [
+            IconButton.filledTonal(
+              icon: Badge(
+                smallSize: AppSpacing.spacing8,
+                backgroundColor: colors.primary,
+                child: const Icon(Icons.notifications),
+              ),
+              onPressed: () {},
+            ),
+            const SizedBox(width: AppSpacing.spacing8),
+            PopupMenuButton<String>(
+              onSelected: (valor) {
+                if (valor == 'salir') {
+                  FirebaseAuth.instance.signOut();
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'salir',
+                  child: Text('Cerrar sesión'),
+                ),
+              ],
+              child: CircleAvatar(
+                backgroundColor: colors.secondaryContainer,
+                child: const Icon(Icons.person),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.spacing16),
+          ],
           bottom: const TabBar(
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
             tabs: [
               Tab(text: 'Songs'),
               Tab(text: 'Artists'),
+              Tab(text: 'Albums'),
               Tab(text: 'Playlists'),
             ],
           ),
@@ -149,10 +183,9 @@ class LibraryScreen extends StatelessWidget {
         ),
         body: TabBarView(
           children: [
-            // Songs: canciones favoritas
             const FavoritesTab(),
-
-            const Center(child: Text('Próximamente')),
+            const ArtistsTab(),
+            const AlbumsTab(),
 
             // Playlists del usuario
             StreamBuilder<QuerySnapshot>(

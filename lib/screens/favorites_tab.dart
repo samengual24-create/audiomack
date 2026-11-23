@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../theme/theme.dart';
+import 'cover_tile.dart';
 import 'player_screen.dart';
 
 class FavoritesTab extends StatelessWidget {
@@ -31,20 +32,27 @@ class FavoritesTab extends StatelessWidget {
           );
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(AppSpacing.spacing8),
+        return GridView.builder(
+          padding: const EdgeInsets.all(AppSpacing.spacing16),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: AppSpacing.spacing16,
+            mainAxisSpacing: AppSpacing.spacing16,
+            childAspectRatio: 0.8,
+          ),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final doc = docs[index];
             final c = doc.data() as Map<String, dynamic>;
 
-            return ListTile(
-              leading: const Icon(Icons.favorite),
-              title: Text((c['titulo'] ?? '').toString()),
-              subtitle: Text((c['artista'] ?? '').toString()),
-              trailing: IconButton(
-                icon: const Icon(Icons.close),
+            return CoverTile(
+              portada: (c['portada'] ?? '').toString(),
+              titulo: (c['titulo'] ?? '').toString(),
+              subtitulo: (c['artista'] ?? '').toString(),
+              accion: IconButton.filledTonal(
+                iconSize: AppSpacing.spacing16,
                 tooltip: 'Quitar de favoritos',
+                icon: const Icon(Icons.favorite),
                 onPressed: () => doc.reference.delete(),
               ),
               onTap: () {
